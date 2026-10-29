@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Last Stop: Zombie Gas Station</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --asphalt:#14171a; --panel:rgba(16,18,20,.74); --sodium:#f4a52b; --canopy:#d33a2c;
+    --led:#ffd27a; --bile:#9ccc3c; --paper:#f1ece2; --dim:#a39d92;
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --asphalt:#14171a; --panel:rgba(16,18,20,.74); --paper:#f1ece2; --dim:#a39d92; }
+  }
+  :root[data-theme="dark"]{ --asphalt:#14171a; --panel:rgba(16,18,20,.74); --paper:#f1ece2; --dim:#a39d92; }
+  html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);touch-action:none}
+  body{height:100%;margin:0;background:var(--asphalt);color:var(--paper);overflow:hidden;
+    font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none}
+  *,*::before,*::after{box-sizing:border-box}
+  [hidden]{display:none!important}
+  #game{position:fixed;inset:0}
+  #game canvas{display:block;width:100%;height:100%;touch-action:none}
+  body.playing.desk #game canvas{cursor:none}
+
+  .hud{position:fixed;inset:0;pointer-events:none;z-index:2}
+  .panel{background:var(--panel);border:1px solid rgba(255,255,255,.07);border-radius:4px;padding:8px 12px}
+  .lbl{font-size:15px;color:var(--dim);font-weight:600}
+  .big{font-family:Bungee,Impact,'Arial Black',sans-serif;color:var(--led);font-size:26px;line-height:1}
+  #scoreBox{position:absolute;top:calc(12px + var(--safe-t));left:calc(12px + var(--safe-l));min-width:110px}
+  #waveBox{position:absolute;top:calc(12px + var(--safe-t));left:50%;transform:translateX(-50%);text-align:center;width:min(440px,44vw)}
+  #waveNum{font-family:Bungee,Impact,sans-serif;font-size:26px;text-shadow:0 2px 0 rgba(0,0,0,.6)}
+  #leftNum{font-size:18px;color:var(--paper);opacity:.8;font-weight:600;text-shadow:0 1px 2px #000}
+  #bossWrap{margin-top:10px}
+  #bossName{font-family:Bungee,Impact,sans-serif;color:var(--canopy);font-size:16px;text-shadow:0 1px 2px #000}
+  .bossBar{height:12px;background:rgba(0,0,0,.65);border:1px solid var(--canopy);margin-top:4px;border-radius:2px;overflow:hidden}
+  #bossFill{height:100%;width:100%;background:var(--canopy);transition:width .12s linear}
+  #radar{position:absolute;top:calc(12px + var(--safe-t));right:calc(12px + var(--safe-r));width:130px;height:130px}
+  #healthBox{position:absolute;left:calc(12px + var(--safe-l));bottom:calc(14px + var(--safe-b));width:min(300px,40vw)}
+  .hpRow{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .hpBar{height:16px;background:rgba(0,0,0,.55);margin-top:6px;position:relative;overflow:hidden;border-radius:2px}
+  #hpFill{height:100%;width:100%;background:var(--sodium);transition:width .15s,background-color .3s}
+  .hpBar::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),rgba(16,18,20,.95) calc(10% - 2px) 10%)}
+  #healthBox.low #hpFill{background:var(--canopy)}
+  #armorWrap{margin-bottom:8px}
+  .arBar{height:10px}
+  #arFill{height:100%;width:100%;background:#4a86ff;transition:width .15s}
+  .arNum{font-size:22px;color:#8fc0ff}
+  body.touch #healthBox{display:flex;flex-direction:column}
+  body.touch #armorWrap{order:2;margin:6px 0 -11px;position:relative;z-index:1}
+  body.touch #armorWrap .hpRow{display:none}
+  body.touch .arBar{height:5px;margin-top:0}
+  body.touch #healthBox>.hpBar{order:3}
+  body.touch #healthBox>.hpBar{order:3}
+  body.touch #perkRow{order:4}
+  #healthBox.low #hpNum{color:var(--canopy)}
+  #ammoBox{position:absolute;right:calc(12px + var(--safe-r));bottom:calc(14px + var(--safe-b));text-align:right;min-width:140px}
+  #weapName{font-size:18px;font-weight:700}
+  #ammoNum{font-size:40px}
+  #ammoMax{font-size:20px;color:var(--dim);font-weight:600;margin-left:4px}
+  #reloadTxt{font-size:16px;color:var(--sodium);min-height:20px;font-weight:600}
+  #cross{position:absolute;left:50%;top:50%;--g:8px;transition:opacity .1s}
+  #cross i{position:absolute;background:rgba(241,236,226,.92);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+  #cross .t,#cross .b{width:2px;height:8px;left:-1px}
+  #cross .t{top:calc(-1 * var(--g) - 8px)} #cross .b{top:var(--g)}
+  #cross .l,#cross .r{height:2px;width:8px;top:-1px}
+  #cross .l{left:calc(-1 * var(--g) - 8px)} #cross .r{left:var(--g)}
+  #cross b{position:absolute;width:2px;height:2px;left:-1px;top:-1px;background:var(--sodium)}
+  #hit{position:absolute;left:50%;top:50%;width:24px;height:24px;margin:-12px 0 0 -12px;opacity:0}
+  #hit::before,#hit::after{content:'';position:absolute;left:50%;top:0;width:2px;height:100%;background:#fff;box-shadow:0 0 2px #000}
+  #hit::before{transform:translateX(-50%) rotate(45deg)} #hit::after{transform:translateX(-50%) rotate(-45deg)}
+  #hit.kill::before,#hit.kill::after{background:var(--canopy)}
+  #banner{position:absolute;top:26%;left:0;right:0;text-align:center;font-family:Bungee,Impact,sans-serif;font-size:clamp(28px,6vw,62px);
+    text-shadow:0 3px 0 rgba(0,0,0,.6);opacity:0;transition:opacity .35s;padding:0 16px}
+  #banner small{display:block;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:22px;font-weight:700;color:var(--sodium);margin-top:6px}
+  #banner.show{opacity:1}
+  #popups{position:absolute;left:50%;top:calc(50% + 28px);transform:translateX(-50%);text-align:center;width:300px}
+  .pop{font-family:Bungee,Impact,sans-serif;font-size:16px;color:var(--led);text-shadow:0 1px 2px #000;animation:pop .8s ease-out forwards}
+  .pop.head{color:#ff6a4a} .pop.heal{color:var(--bile)}
+  @keyframes pop{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-24px)}}
+  @media (prefers-reduced-motion: reduce){ @keyframes pop{from{opacity:1}to{opacity:0}} #banner{transition:none} }
+  #frost{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .25s;background:radial-gradient(ellipse at center,transparent 50%,rgba(150,220,255,.75) 100%)}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;
+    background:radial-gradient(ellipse at center,transparent 42%,rgba(160,8,8,.88) 100%)}
+
+  #touchUI{position:fixed;inset:0;z-index:4;pointer-events:none}
+  #joy{position:absolute;left:calc(26px + var(--safe-l));bottom:calc(30px + var(--safe-b));width:124px;height:124px;border-radius:50%;
+    background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.22);pointer-events:auto;touch-action:none}
+  #joyKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(244,165,43,.65)}
+  .tbtn{position:absolute;pointer-events:auto;border-radius:50%;border:2px solid rgba(255,255,255,.25);background:rgba(16,18,20,.6);
+    color:var(--paper);font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:16px;touch-action:none;padding:0}
+  .tbtn.on{background:rgba(244,165,43,.55)}
+  #tFire{right:calc(24px + var(--safe-r));bottom:calc(30px + var(--safe-b));width:90px;height:90px;background:rgba(211,58,44,.62)}
+  #tAim{right:calc(126px + var(--safe-r));bottom:calc(26px + var(--safe-b));width:60px;height:60px}
+  #tReload{right:calc(126px + var(--safe-r));bottom:calc(96px + var(--safe-b));width:58px;height:58px}
+  #tJump{right:calc(30px + var(--safe-r));bottom:calc(132px + var(--safe-b));width:62px;height:62px}
+  #tNade{right:calc(196px + var(--safe-r));bottom:calc(100px + var(--safe-b));width:56px;height:56px;background:rgba(74,86,54,.7)}
+  #tSwap{right:calc(196px + var(--safe-r));bottom:calc(30px + var(--safe-b));width:56px;height:56px}
+  #tPause{right:calc(12px + var(--safe-r));top:calc(152px + var(--safe-t));width:44px;height:44px;font-size:14px}
+  body.touch #healthBox{top:calc(84px + var(--safe-t));bottom:auto;width:min(220px,36vw)}
+  body.touch #ammoBox{bottom:calc(200px + var(--safe-b))}
+  @media (max-width:640px){
+    #radar{width:96px;height:96px}
+    #waveNum{font-size:20px} #leftNum{font-size:15px}
+    #tPause{top:calc(116px + var(--safe-t))}
+  }
+
+  .screen{position:fixed;inset:0;z-index:6;display:flex;align-items:center;overflow-y:auto;
+    padding:calc(24px + var(--safe-t)) max(24px,6vw) calc(24px + var(--safe-b));
+    background:linear-gradient(90deg,rgba(10,12,14,.94) 0%,rgba(10,12,14,.72) 48%,rgba(10,12,14,.08) 100%);touch-action:pan-y}
+  .card{max-width:580px;width:100%;margin:auto 0}
+  .sign{display:inline-block;background:var(--canopy);color:var(--paper);font-family:Bungee,Impact,'Arial Black',sans-serif;
+    font-size:clamp(52px,10vw,104px);line-height:.92;padding:16px 24px 12px;border-radius:6px;
+    box-shadow:0 0 0 4px var(--paper),0 0 0 8px var(--canopy),0 0 60px rgba(211,58,44,.45)}
+  .sign.small{font-size:clamp(36px,7vw,64px)}
+  .tag{font-size:24px;margin:26px 0 22px;font-weight:600;line-height:1.25;max-width:32ch}
+  .btn{font-family:Bungee,Impact,sans-serif;font-size:20px;background:var(--sodium);color:#1c1306;border:0;border-radius:4px;
+    padding:14px 26px 12px;cursor:pointer;box-shadow:0 4px 0 #9c6312}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #9c6312}
+  .btn:focus-visible{outline:3px solid var(--paper);outline-offset:4px}
+  .cols{display:grid;grid-template-columns:1fr 1.2fr;gap:28px;margin-top:34px}
+  .cols h3{font-family:Bungee,Impact,sans-serif;font-size:16px;color:var(--sodium);margin:0 0 10px;font-weight:400}
+  dl.keys{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font-size:18px}
+  dl.keys dd{margin:0;color:var(--paper)}
+  kbd{font-family:inherit;font-weight:700;color:var(--led)}
+  ul.types{list-style:none;padding:0;margin:0;font-size:18px;display:grid;gap:5px}
+  ul.types b{font-weight:700}
+  .chip{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:9px;vertical-align:1px}
+  .best{margin-top:26px;color:var(--dim);font-size:18px}
+  .stats{font-size:22px;line-height:1.5;margin:24px 0}
+  .stats strong{font-family:Bungee,Impact,sans-serif;font-weight:400;color:var(--led)}
+  body:not(.touch) .touch-only{display:none} body.touch .desk-only{display:none}
+  @media (max-width:640px){ .cols{grid-template-columns:1fr} .screen{background:rgba(10,12,14,.86)} }
+  #scoreBox .sub{font-size:16px;color:var(--dim);font-weight:600;margin-top:4px}
+  #scoreBox #score{color:var(--paper)}
+  #slotHint{margin-top:2px}
+  body.touch #healthBox{top:calc(112px + var(--safe-t))}
+  .pitch{font-size:19px;line-height:1.4;color:var(--dim);max-width:46ch;margin:-8px 0 24px}
+  #scope{position:fixed;inset:0;pointer-events:none;z-index:2;--r:min(36vh,36vw);
+    background:radial-gradient(circle at center,transparent 0 var(--r),#000 calc(var(--r) + 2px))}
+  #scope.acog,#scope.aug{--r:min(42vh,42vw)}
+  #scope svg{position:absolute;left:50%;top:50%;width:calc(var(--r) * 2);height:calc(var(--r) * 2);transform:translate(-50%,-50%);overflow:visible}
+  #reticle{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2}
+  #reticle::before{content:'';position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:#ff3a2a;box-shadow:0 0 6px 2px rgba(255,58,42,.7)}
+  #reticle.holo::before{left:-2px;top:-2px;width:4px;height:4px}
+  #reticle.holo::after{content:'';position:absolute;left:-15px;top:-15px;width:30px;height:30px;border-radius:50%;border:2px solid #ff3a2a;box-shadow:0 0 5px rgba(255,58,42,.6)}
+
+  .shop{background:rgba(10,12,14,.95);align-items:flex-start;display:block}
+  .shopWrap{max-width:1000px;width:100%;margin:0 auto}
+  .shopHead{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .shopHead .tag{margin:20px 0 0}
+  .cashBox{text-align:right}
+  .cashBig{font-family:Bungee,Impact,sans-serif;font-size:44px;color:var(--led);line-height:1}
+  .shop h3{font-family:Bungee,Impact,sans-serif;font-size:16px;color:var(--sodium);font-weight:400;margin:30px 0 10px}
+  .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media (max-width:1000px){ .slots{grid-template-columns:repeat(2,1fr)} }
+  .slot{background:var(--panel);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+  .slot.active{border-color:var(--sodium)}
+  .slotNum{font-size:15px;color:var(--dim);font-weight:600}
+  .slotName{font-family:Bungee,Impact,sans-serif;font-size:20px}
+  .slotName.dim{color:var(--dim)}
+  .slotAmmo{font-size:17px;color:var(--dim)}
+  .sbtn{margin-top:8px;align-self:flex-start;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:17px;
+    background:transparent;color:var(--paper);border:2px solid var(--sodium);border-radius:3px;padding:6px 12px;cursor:pointer}
+  .sbtn:hover:not(:disabled){background:rgba(244,165,43,.15)}
+  .sbtn:disabled{border-color:rgba(255,255,255,.15);color:var(--dim);cursor:not-allowed}
+  .sbtn:focus-visible{outline:3px solid var(--paper);outline-offset:2px}
+  .sbtn.ghost{border-color:rgba(255,255,255,.25)}
+  .board{background:#ece6da;color:#1b1d20;border-radius:6px;overflow:hidden;box-shadow:0 0 0 4px var(--canopy)}
+  .item{display:grid;grid-template-columns:1.5fr 1fr auto 150px;gap:18px;align-items:center;padding:12px 16px;border-top:1px solid rgba(0,0,0,.12)}
+  .item:first-child{border-top:0}
+  .item.owned{background:rgba(0,0,0,.05)}
+  .iname{font-family:Bungee,Impact,sans-serif;font-size:20px}
+  .idesc{font-size:17px;color:#4a4740;line-height:1.3}
+  .ichips{font-size:14px;font-weight:700;color:#7a5a2a;margin-top:4px;letter-spacing:.01em}
+  .ghead{font-family:Bungee,Impact,sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;background:#d6cdbc;color:#4a4740;border-top:1px solid rgba(0,0,0,.14)}
+  .ghead:first-child{border-top:0}
+  .stats3{display:grid;gap:5px}
+  .stat{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#4a4740}
+  .stat i{height:8px;background:rgba(0,0,0,.12);position:relative;display:block;overflow:hidden}
+  .stat i::before{content:'';position:absolute;top:0;bottom:0;left:0;width:var(--v);background:#1b1d20}
+  .stat i::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),#ece6da calc(10% - 2px) 10%)}
+  .price{font-family:'Courier New',monospace;font-weight:700;font-size:26px;background:#1b1d20;color:#ff4a2a;padding:6px 12px;border-radius:2px;min-width:118px;text-align:right}
+  .item .sbtn{margin:0;align-self:center;border-color:#1b1d20;color:#1b1d20;width:100%}
+  .item .sbtn.buy{background:#1b1d20;color:var(--led)}
+  .item .sbtn:hover:not(:disabled){background:#33363a;color:var(--led)}
+  .item .sbtn:disabled{border-color:rgba(0,0,0,.2);color:rgba(0,0,0,.5)}
+  .item .sbtn:focus-visible{outline-color:var(--canopy)}
+  .shopFoot{position:sticky;bottom:0;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;padding:18px 0 6px;margin-top:10px;
+    background:linear-gradient(transparent,rgba(10,12,14,.95) 40%)}
+  .dlg{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:8;padding:24px}
+  .dlgCard{background:#1b1d20;border:2px solid var(--sodium);border-radius:6px;padding:22px;max-width:440px;width:100%}
+  .dlgCard p{font-size:22px;font-weight:600;margin:0 0 16px;line-height:1.3}
+  .dlgBtns{display:grid;gap:10px}
+  .dlgBtns .sbtn{margin:0;width:100%;align-self:stretch;font-size:19px;padding:10px 14px}
+  #keysDlg{z-index:9}
+  .keysCard{max-width:560px;max-height:calc(100vh - 48px);overflow-y:auto;scroll-padding-bottom:84px}
+  .dlgCard p.keysHint{font-size:16px;font-weight:400;color:var(--dim);min-height:2.6em;margin-bottom:12px}
+  .keyGrid{display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;align-items:center;font-size:18px}
+  .kbtn{min-width:118px;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:17px;background:#24272b;color:var(--led);
+    border:2px solid rgba(255,255,255,.22);border-radius:3px;padding:5px 10px;cursor:pointer}
+  .kbtn:hover{border-color:var(--sodium)}
+  .kbtn:focus-visible{outline:3px solid var(--paper);outline-offset:2px}
+  .kbtn.empty{color:var(--dim)}
+  .kbtn.listen{border-color:var(--sodium);color:var(--paper);background:rgba(244,165,43,.18)}
+  .keysFoot{display:flex;justify-content:space-between;gap:10px;margin-top:18px;position:sticky;bottom:-22px;background:#1b1d20;padding:12px 0 22px;margin-bottom:-22px}
+  #keyList{grid-template-columns:fit-content(46%) 1fr}
+  @media (max-width:420px){ .keyGrid{grid-template-columns:1fr 1fr} .keyGrid>div{grid-column:1/-1;margin-top:4px} .kbtn{min-width:0} }
+  .keysFoot .sbtn{margin:0}
+  #keysBtn{margin-top:12px}
+  @media (max-width:640px){ .kbtn{min-width:92px} }
+  @media (max-width:760px){
+    .item{grid-template-columns:1fr auto;gap:10px 14px}
+    .stats3{grid-column:1 / -1;order:3}
+    .item .sbtn{grid-column:1 / -1;order:4}
+    .slots{grid-template-columns:1fr}
+  }
+
+  #papPrompt{position:absolute;left:50%;bottom:calc(118px + var(--safe-b));transform:translateX(-50%);text-align:center;background:rgba(26,12,38,.88);
+    border:2px solid #b04aff;border-radius:6px;padding:10px 16px;width:max-content;max-width:min(560px,88vw)}
+  #papTxt{font-weight:700;font-size:19px}
+  #papSub{font-size:16px;color:#d9b8ff;margin-top:2px}
+  #papPrompt.poor #papSub{color:#ff8a7a}
+  .papBar{height:8px;background:rgba(255,255,255,.12);margin-top:8px;border-radius:2px;overflow:hidden;display:none}
+  #papPrompt.busy .papBar{display:block}
+  #papFill{display:block;height:100%;width:0;background:#b04aff}
+  body.touch #papPrompt{bottom:calc(214px + var(--safe-b))}
+  #tPap{left:50%;transform:translateX(-50%);bottom:calc(150px + var(--safe-b));width:132px;height:54px;border-radius:27px;background:rgba(176,74,255,.72);font-size:18px}
+  .btnRow{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .mapPick{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 0 16px;max-width:560px}
+  .diffPick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px;max-width:560px}
+  .mapBtn,.diffBtn{font:inherit;text-align:left;cursor:pointer;background:rgba(0,0,0,.35);color:var(--paper);border:0;border-radius:4px;padding:10px 12px;box-shadow:inset 0 0 0 2px rgba(241,236,226,.18)}
+  .mapBtn b,.diffBtn b{display:block;font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:17px;letter-spacing:.02em}
+  .mapBtn span,.diffBtn span{display:block;font-size:15px;line-height:1.25;color:var(--dim);margin-top:2px}
+  .mapBtn.on,.diffBtn.on{box-shadow:inset 0 0 0 2px var(--sodium);background:rgba(244,165,43,.12)}
+  .mapBtn.on b,.diffBtn.on b{color:var(--sodium)}
+  @media (max-width:520px){ .mapPick{grid-template-columns:1fr} .diffBtn{text-align:center} .diffBtn span{display:none} }
+  .btn.alt{background:transparent;color:var(--paper);box-shadow:inset 0 0 0 2px var(--sodium)}
+  .btn.alt:active{transform:translateY(1px);box-shadow:inset 0 0 0 2px var(--sodium)}
+  .shopNote{font-size:17px;color:var(--dim);margin:-4px 0 10px}
+  #perkRow{display:flex;gap:5px;flex-wrap:wrap}
+  #perkRow:not(:empty){margin-top:7px}
+  .perk{width:24px;height:24px;border-radius:4px;background:var(--pc);color:#111;font-weight:700;font-size:15px;display:grid;place-items:center;line-height:1;transition:opacity .2s}
+  .perk.cool{opacity:.3}
+  #codeIn{width:100%;font:600 20px 'Barlow Condensed','Arial Narrow',sans-serif;padding:10px 12px;margin:0 0 14px;border-radius:4px;
+    border:2px solid rgba(255,255,255,.2);background:#0e1013;color:var(--paper);-webkit-user-select:text;user-select:text}
+  #codeIn:focus{outline:none;border-color:var(--sodium)}
+  .coop{margin:24px 0 0;max-width:560px}
+  .coop h3{font-family:Bungee,Impact,sans-serif;font-size:16px;color:var(--sodium);margin:0 0 10px;font-weight:400}
+  .coopRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .coopIn{font:600 19px 'Barlow Condensed','Arial Narrow',sans-serif;padding:7px 10px;border-radius:4px;border:2px solid rgba(255,255,255,.2);
+    background:#0e1013;color:var(--paper);width:150px;-webkit-user-select:text;user-select:text}
+  .coopIn.code{width:104px;text-transform:uppercase;letter-spacing:.14em}
+  .coopIn:focus{outline:none;border-color:var(--sodium)}
+  .coop .sbtn{margin:0;align-self:center}
+  .coopNote{font-size:17px;color:var(--dim);margin:8px 0 0;min-height:1.3em;line-height:1.3}
+  .coopNote:empty{display:none}
+  .lobbyHead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:20px;font-weight:600}
+  .lobbyHead b{font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:30px;color:var(--led);letter-spacing:.1em;margin-right:4px;-webkit-user-select:text;user-select:text}
+  .lobbyList{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:4px;font-size:19px;font-weight:600}
+  #lobbyHint{font-size:17px;color:var(--dim);margin:6px 0 0}
+  .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;flex:none}
+  #team{position:absolute;left:calc(12px + var(--safe-l));top:calc(100px + var(--safe-t));display:grid;gap:6px;width:170px}
+  .tm{background:var(--panel);border-radius:4px;padding:5px 8px;font-size:16px;font-weight:700;display:flex;align-items:center;flex-wrap:wrap;gap:0 4px}
+  .tm .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tm .st{font-size:14px;color:var(--dim)}
+  .tm .hb{order:2;flex-basis:100%;height:5px;background:rgba(0,0,0,.55);margin-top:4px;border-radius:2px;overflow:hidden}
+  .tm .hb b{display:block;height:100%;background:var(--sodium)}
+  .tm.down .hb b{background:var(--canopy)} .tm.down .st{color:#ff6a5a}
+  body.touch #team{left:50%;transform:translateX(-50%);top:calc(64px + var(--safe-t));display:flex;flex-wrap:wrap;justify-content:center;gap:4px;width:max-content;max-width:max(216px,calc(100vw - 470px))}
+  body.touch .tm{font-size:13px;padding:2px 6px 3px;width:96px;min-width:68px;flex:0 1 96px}
+  body.touch #team.lo, body.touch #hostWait.lo{top:calc(124px + var(--safe-t))}  /* below the boss bar */
+  body.touch .tm .st{display:none}
+  body.touch .tm .hb{margin-top:2px;height:4px}
+  body.touch .tm.down{background:rgba(150,28,20,.9)}
+  body.touch #papPrompt:not([hidden]) ~ #team, body.touch #hostWait:not([hidden]) ~ #team{visibility:hidden}
+  #downNote{position:absolute;left:50%;top:56%;transform:translateX(-50%);text-align:center;background:var(--panel);border:2px solid var(--canopy);
+    border-radius:6px;padding:12px 18px;width:max-content;max-width:min(440px,88vw);pointer-events:auto}
+  #downNote b{font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:22px;color:#ff6a5a}
+  #downNote p{font-size:18px;margin:6px 0 2px;line-height:1.3}
+  #downNote .sbtn{align-self:center}
+  body.touch #downNote{top:auto;bottom:calc(12px + var(--safe-b))}  /* the touch buttons are hidden while you're down */
+  #aimHint,#hostWait{position:absolute;left:50%;top:calc(50% + 34px);transform:translateX(-50%);font-size:18px;font-weight:700;background:var(--panel);padding:4px 12px;border-radius:4px}
+  #hostWait{top:calc(50% - 76px);white-space:nowrap}
+  body.touch #hostWait{top:calc(64px + var(--safe-t))}
+  .mapBtn:disabled,.diffBtn:disabled{cursor:default;opacity:.7}
+  .diffBtn.locked{opacity:.32;cursor:not-allowed}
+  .tester{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:10px}
+  .tz{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:6px 10px}
+  .tz.boss{border-color:rgba(211,58,44,.55)}
+  .tz .tzn{flex:1;font-weight:700;font-size:16px}
+  .tz .sbtn{margin:0;padding:2px 10px;min-width:36px;font-size:18px}
+  .tz b{min-width:22px;text-align:center;font-family:Bungee,Impact,sans-serif;color:var(--led)}
+  .testerBtns{display:flex;align-items:center;gap:14px;margin-bottom:6px;color:var(--dim);font-size:16px}
+  .testerBtns .sbtn{margin:0}
+</style>
+</head>
+<body class="desk">
+<div id="game"></div>
+<div id="scope" hidden></div>
+<div id="reticle" hidden></div>
+<div id="keysDlg" class="dlg" hidden>
+  <div class="dlgCard keysCard" role="dialog" aria-modal="true" aria-labelledby="keysTitle">
+    <p id="keysTitle">Controls</p>
+    <p class="keysHint" id="keysHint" aria-live="polite"></p>
+    <div class="keyGrid" id="keyGrid"></div>
+    <div class="keysFoot"><button class="sbtn ghost" id="keysReset">Reset to defaults</button><button class="sbtn" id="keysDone">Done</button></div>
+  </div>
+</div>
+<div id="vignette"></div>
+<div id="frost"></div>
+
+<div class="hud" id="hud" hidden>
+  <div id="papPrompt" hidden><div id="papTxt"></div><div id="papSub"></div><div class="papBar"><i id="papFill"></i></div></div>
+  <div id="scoreBox" class="panel"><div class="lbl">Cash</div><div class="big" id="cash">$0</div><div class="sub">Score <span id="score">0</span></div></div>
+  <div id="waveBox">
+    <div id="waveNum">Get ready</div>
+    <div id="leftNum"></div>
+    <div id="bossWrap" hidden><div id="bossName"></div><div class="bossBar"><div id="bossFill"></div></div></div>
+  </div>
+  <canvas id="radar" width="260" height="260"></canvas>
+  <div id="healthBox" class="panel">
+    <div id="armorWrap" hidden><div class="hpRow"><span class="lbl" id="arLbl">Armor</span><span class="big arNum" id="arNum">0</span></div><div class="hpBar arBar"><div id="arFill"></div></div></div>
+    <div class="hpRow"><span class="lbl" id="hpLbl">Health</span><span class="big" id="hpNum">100</span></div>
+    <div class="hpBar"><div id="hpFill"></div></div>
+    <div id="perkRow"></div>
+  </div>
+  <div id="ammoBox" class="panel">
+    <div id="weapName">Rifle</div>
+    <div><span id="ammoNum" class="big">30</span><span id="ammoMax">/ 30</span></div>
+    <div id="reloadTxt"></div>
+    <div id="slotHint" class="lbl"></div>
+    <div id="nadeHud" class="lbl"></div>
+  </div>
+  <div id="cross"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><b></b></div>
+  <div id="hit"></div>
+  <div id="banner"></div>
+  <div id="popups"></div>
+  <div id="hostWait" hidden>Waiting for the host...</div>
+  <div id="team" hidden></div>
+  <div id="aimHint" hidden>Click to aim</div>
+  <div id="downNote" hidden><b>You're down</b><p id="downTxt"></p><button class="sbtn ghost" id="downLeave">Leave game</button></div>
+</div>
+
+<div id="touchUI" hidden>
+  <div id="joy"><div id="joyKnob"></div></div>
+  <button class="tbtn" id="tFire" aria-label="Fire">Fire</button>
+  <button class="tbtn" id="tAim" aria-label="Aim">Aim</button>
+  <button class="tbtn" id="tReload" aria-label="Reload">Reload</button>
+  <button class="tbtn" id="tJump" aria-label="Jump">Jump</button>
+  <button class="tbtn" id="tSwap" aria-label="Switch weapon">Swap</button>
+  <button class="tbtn" id="tPause" aria-label="Pause">II</button>
+  <button class="tbtn" id="tNade" aria-label="Throw grenade">Nade</button>
+  <button class="tbtn" id="tPap" aria-label="Use Pump-a-Punch" hidden>Punch</button>
+</div>
+
+<section id="titleScreen" class="screen">
+  <div class="card">
+    <div class="sign">Last<br>Stop</div>
+    <p class="tag">Gas and food, open all night. So are they.</p>
+    <p class="pitch">You start with a pistol and $500. Every kill pays, and the counter opens between waves so you can buy bigger guns. You can carry two at a time.</p>
+    <div class="mapPick" role="group" aria-label="Choose a map">
+      <button class="mapBtn" data-map="station"><b>Last Stop</b><span>The all-night gas station</span></button>
+      <button class="mapBtn" data-map="engine"><b>Dead Engine</b><span>A frozen research site with a machine that hums</span></button>
+      <button class="mapBtn" data-map="prison"><b>Lockwater</b><span>A prison island lost in the fog</span></button>
+      <button class="mapBtn" data-map="castle"><b>Ravenhold</b><span>Hard only. A walled castle, +50% cash, up to 8 players</span></button>
+    </div>
+    <div class="diffPick" role="group" aria-label="Choose a difficulty">
+      <button class="diffBtn" data-diff="easy"><b>Easy</b><span>Fewer, slower, weaker zombies</span></button>
+      <button class="diffBtn" data-diff="normal"><b>Normal</b><span>The standard fight</span></button>
+      <button class="diffBtn" data-diff="hard"><b>Hard</b><span>More of them, faster, and they hit harder</span></button>
+    </div>
+    <div class="btnRow"><button class="btn" id="continueBtn" hidden>Continue</button><button class="btn" id="startBtn">Start game</button></div>
+    <div class="coop">
+      <h3>Play with friends</h3>
+      <div class="coopRow" id="coopForm">
+        <input class="coopIn" id="mpName" type="text" maxlength="14" placeholder="Your name" autocomplete="nickname" spellcheck="false" aria-label="Your name">
+        <button class="sbtn" id="hostBtn">Host co-op</button>
+        <input class="coopIn code" id="joinCode" type="text" maxlength="5" placeholder="Code" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Game code">
+        <button class="sbtn" id="joinBtn">Join</button>
+      </div>
+      <div id="coopLobby" hidden>
+        <div class="lobbyHead">Code <b id="lobbyCode"></b><button class="sbtn" id="copyCode">Copy code</button><button class="sbtn ghost" id="leaveBtn">Leave</button></div>
+        <p id="lobbyHint"></p>
+        <ul class="lobbyList" id="lobbyList"></ul>
+      </div>
+      <p class="coopNote" id="coopNote" aria-live="polite"></p>
+    </div>
+    <div class="cols">
+      <div>
+        <h3>Controls</h3>
+        <dl class="keys desk-only" id="keyList"></dl>
+        <button class="sbtn desk-only" id="keysBtn">Change controls</button>
+        <dl class="keys touch-only">
+          <dt><kbd>Left stick</kbd></dt><dd>Move, push fully to sprint</dd>
+          <dt><kbd>Drag</kbd></dt><dd>Look around</dd>
+          <dt><kbd>Fire</kbd></dt><dd>Hold to shoot, drag to aim</dd>
+          <dt><kbd>Aim</kbd></dt><dd>Toggle sights</dd>
+          <dt><kbd>Swap</kbd></dt><dd>Switch weapons</dd>
+          <dt><kbd>Nade</kbd></dt><dd>Throw grenade</dd>
+          <dt><kbd>Punch / Buy</kbd></dt><dd>Use Pump-a-Punch, perks, ammo crates, armor and the Mystery Crate</dd>
+        </dl>
+      </div>
+      <div>
+        <h3>What's out there</h3>
+        <ul class="types">
+          <li><span class="chip" style="background:#8fae6a"></span><b>Walker</b>, slow and endless</li>
+          <li><span class="chip" style="background:#e0563c"></span><b>Runner</b>, fast but fragile</li>
+          <li><span class="chip" style="background:#d8913a"></span><b>Brute</b>, soaks bullets, hits hard</li>
+          <li><span class="chip" style="background:#d2da40"></span><b>Spitter</b>, lobs acid from range</li>
+          <li><span class="chip" style="background:#c070c8"></span><b>Bloater</b>, explodes, shoot it early</li>
+          <li><span class="chip" style="background:#5a8fd8"></span><b>Riot</b>, armored body, aim for the face</li>
+          <li><span class="chip" style="background:#ff4fa0"></span><b>Screamer</b>, enrages the horde, kill it first</li>
+          <li><span class="chip" style="background:#40ffe0"></span><b>Stalker</b>, nearly invisible, dodges your aim</li>
+          <li><span class="chip" style="background:#e6e6e6"></span><b>Spider</b>, fast, tanky and vicious, from wave 10</li>
+          <li><span class="chip" style="background:#ff2a2a"></span><b>Four bosses</b> take turns every fifth wave</li>
+        </ul>
+      </div>
+    </div>
+    <p class="best" id="bestLine"></p>
+  </div>
+</section>
+
+<section id="shopScreen" class="screen shop" hidden>
+  <div class="shopWrap">
+    <div class="shopHead">
+      <div><div class="sign small">Food Mart</div><p class="tag" id="shopTitle">Wave cleared.</p></div>
+      <div class="cashBox"><div class="lbl">Cash</div><div class="cashBig" id="shopCash" role="presentation">$0</div></div>
+    </div>
+    <div id="testerWrap" hidden>
+      <h3>Tester: next wave</h3>
+      <p class="shopNote">Pick exactly what spawns next wave. Bosses arrive 3 seconds in. After that wave, things go back to normal.</p>
+      <div class="tester" id="tester"></div>
+      <div class="testerBtns"><button class="sbtn" data-tclear="1">Clear</button><span id="testerSum"></span></div>
+    </div>
+    <h3>Your loadout</h3>
+    <p class="shopNote" id="shopNote">Upgrade the gun in your hand at the glowing Pump-a-Punch machine.</p>
+    <div class="slots" id="slots"></div>
+    <h3>Behind the counter</h3>
+    <div class="board" id="board"></div>
+    <div class="shopFoot"><button class="btn alt" id="shopMenuBtn">Main menu</button><button class="btn" id="nextWaveBtn">Start next wave</button></div>
+  </div>
+  <div id="codeDlg" class="dlg" hidden>
+    <div class="dlgCard" role="dialog" aria-modal="true" aria-labelledby="codeLbl">
+      <p id="codeLbl">Enter code</p>
+      <input id="codeIn" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-labelledby="codeLbl">
+      <div class="dlgBtns"><button class="sbtn" id="codeOk">Enter</button><button class="sbtn ghost" id="codeCancel">Cancel</button></div>
+    </div>
+  </div>
+  <div id="swapDlg" class="dlg" hidden>
+    <div class="dlgCard" role="dialog" aria-modal="true" aria-labelledby="swapText">
+      <p id="swapText"></p>
+      <div class="dlgBtns" id="swapBtns"></div>
+    </div>
+  </div>
+</section>
+
+<section id="pauseScreen" class="screen" hidden>
+  <div class="card">
+    <div class="sign small">Paused</div>
+    <p class="tag" id="pauseTag">The zombies are waiting politely.</p>
+    <div class="btnRow"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="pauseMenuBtn">Main menu</button><button class="btn alt desk-only" id="pauseKeysBtn">Controls</button></div>
+    <p class="best" id="pauseNote"></p>
+  </div>
+</section>
+
+<section id="overScreen" class="screen" hidden>
+  <div class="card">
+    <div class="sign small">Overrun</div>
+    <div class="stats" id="overStats"></div>
+    <div class="btnRow"><button class="btn" id="againBtn">Play again</button><button class="btn alt" id="overMenuBtn">Main menu</button></div>
+    <p class="best" id="overBest"></p>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* Last Stop game code, part 1 of 2: functions. Part 2 is in last-stop.js */
+function applyTouch(){ document.body.classList.toggle('touch',isTouch); document.body.classList.toggle('desk',!isTouch); }
+function bestKey(){ return ((!curMap||curMap.id==='station')?'laststop-best':'laststop-best-'+curMap.id)+(diffId==='normal'?'':'-'+diffId); }
+function loadBest(){ best={score:0,wave:0}; try{ const b=JSON.parse(localStorage.getItem(bestKey())||'null'); if(b&&typeof b.score==='number') best=b; }catch(e){} }
+function saveBest(){ try{ localStorage.setItem(bestKey(),JSON.stringify(best)); }catch(e){} }
+function bestText(){ const mn=curMap?curMap.name:'Last Stop', dn=diffId==='normal'?'':` (${DF.name})`;
+  return best.score>0?`Best run on ${mn}${dn}: wave ${best.wave}, ${best.score.toLocaleString()} points`:(diffId==='normal'?(curMap?curMap.empty:''):`No ${DF.name} runs yet on ${mn}.`); }
+function selectDiff(id,temp){
+  diffId=DIFFS[id]?id:'normal'; DF=DIFFS[diffId];
+  document.querySelectorAll('.diffBtn').forEach(b=>{ const on=b.dataset.diff===diffId; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); });
+  if(!temp) try{ localStorage.setItem('laststop-diff',diffId); }catch(e){}
+  loadBest(); const bl=document.getElementById('bestLine'); if(bl) bl.textContent=bestText();
+}
+function beginMap(id,o){ const g=new THREE.Group(); g.visible=false; scene.add(g); world=g; colliders.length=0; solids.length=0; MAPS[id]=Object.assign({id,group:g,perks:[],uses:[],doors:[],portals:[]},o); return MAPS[id]; }
+function endMap(id){ const m=MAPS[id]; m.colliders=colliders.slice(); m.solids=solids.slice(); world=scene; }
+function lam(color,extra){ const k=color+'|'+(extra?JSON.stringify(extra):''); return _mc[k]||(_mc[k]=new THREE.MeshLambertMaterial(Object.assign({color},extra||{}))); }
+function bgeo(w,h,d){ const k=w+'|'+h+'|'+d; return _gc[k]||(_gc[k]=new THREE.BoxGeometry(w,h,d)); }
+function addBox(w,h,d,mat,x,y,z,o){
+  o=o||{};
+  const m=new THREE.Mesh(bgeo(w,h,d),mat); m.position.set(x,y,z); if(o.ry) m.rotation.y=o.ry;
+  m.castShadow=o.cast!==false; m.receiveShadow=true; world.add(m);
+  if(o.solid!==false) solids.push(m);
+  if(o.collide){ const sw=o.ry&&Math.abs(Math.sin(o.ry))>0.7; const hw=sw?d/2:w/2, hd=sw?w/2:d/2;
+    colliders.push({minX:x-hw,maxX:x+hw,minZ:z-hd,maxZ:z+hd,h:y+h/2}); }
+  return m;
+}
+function batchStatic(group){
+  const unit=new THREE.BoxGeometry(1,1,1), sets=new Map(), sol=new Set(solids), sc=new THREE.Matrix4();
+  for(const o of group.children){
+    if(!o.isMesh||o.isInstancedMesh||o.userData.keep||!o.visible||Array.isArray(o.material)||o.material.transparent) continue;
+    const gp=o.geometry.parameters, box=o.geometry.type==='BoxGeometry'&&gp.widthSegments===1&&gp.heightSegments===1&&gp.depthSegments===1, solid=sol.has(o);
+    const k=(box?'box':o.geometry.uuid)+'|'+o.material.uuid+'|'+o.castShadow+'|'+o.receiveShadow+'|'+solid;
+    let st=sets.get(k); if(!st) sets.set(k,st={geo:box?unit:o.geometry,box,mat:o.material,cast:o.castShadow,recv:o.receiveShadow,solid,list:[]}); st.list.push(o);
+  }
+  for(const st of sets.values()){ if(st.list.length<2) continue;
+    const im=new THREE.InstancedMesh(st.geo,st.mat,st.list.length);
+    st.list.forEach((o,i)=>{ o.updateMatrix(); const m=o.matrix.clone(); if(st.box){ const q=o.geometry.parameters; m.multiply(sc.makeScale(q.width,q.height,q.depth)); } im.setMatrixAt(i,m);
+      group.remove(o); if(st.solid) solids.splice(solids.indexOf(o),1); });
+    im.castShadow=st.cast; im.receiveShadow=st.recv; group.add(im); if(st.solid) solids.push(im); }
+}
+function noiseCanvas(size,r,g,b,v,stains,grid){
+  const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d');
+  const img=x.createImageData(size,size), d=img.data;
+  for(let i=0;i<size*size;i++){ const n=(Math.random()-0.5)*v; d[i*4]=clamp(r+n,0,255); d[i*4+1]=clamp(g+n,0,255); d[i*4+2]=clamp(b+n,0,255); d[i*4+3]=255; }
+  x.putImageData(img,0,0);
+  for(let i=0;i<(stains||0);i++){ x.fillStyle=`rgba(0,0,0,${rand(0.04,0.2)})`; x.beginPath(); x.arc(rand(0,size),rand(0,size),rand(2,14),0,6.283); x.fill(); }
+  if(grid){ x.strokeStyle='rgba(0,0,0,.32)'; x.lineWidth=2; x.strokeRect(1,1,size-2,size-2); }
+  return c;
+}
+function texFrom(canvas,rx,ry){ const t=new THREE.CanvasTexture(canvas); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=4; return t; }
+function flat(w,d,canvas,rep,x,y,z){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshLambertMaterial({map:texFrom(canvas,w/rep,d/rep)}));
+  m.rotation.x=-Math.PI/2; m.position.set(x,y,z); m.receiveShadow=true; world.add(m); return m;
+}
+function car(x,z,ry,color,tilt){
+  const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=ry; if(tilt) g.rotation.z=tilt; world.add(g);
+  const body=new THREE.Mesh(bgeo(4.3,0.9,1.9),lam(color)); body.position.y=0.75;
+  const cab=new THREE.Mesh(bgeo(2.3,0.75,1.75),lam(0x1a2230)); cab.position.set(-0.2,1.55,0);
+  [body,cab].forEach(m=>{ m.castShadow=m.receiveShadow=true; g.add(m); solids.push(m); });
+  for(const wx of [-1.35,1.35]) for(const wz of [-0.9,0.9]){ const w=new THREE.Mesh(wheelGeo,darkMat); w.rotation.x=Math.PI/2; w.position.set(wx,0.38,wz); g.add(w); }
+  const sw=Math.abs(Math.sin(ry))>0.7, hw=sw?0.95:2.15, hd=sw?2.15:0.95;
+  colliders.push({minX:x-hw,maxX:x+hw,minZ:z-hd,maxZ:z+hd,h:1.9});
+}
+function streetlight(x,z,dir){
+  addBox(0.25,8,0.25,metalMat,x,4,z,{collide:true});
+  addBox(2.2,0.15,0.15,metalMat,x+dir*1.1,7.9,z,{cast:false,solid:false});
+  const b=new THREE.Mesh(bgeo(0.7,0.15,0.4),bulbMat); b.position.set(x+dir*2.1,7.8,z); world.add(b);
+}
+</script>
+<script src="last-stop.js"></script>
+</body>
+</html>
